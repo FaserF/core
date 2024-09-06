@@ -32,16 +32,19 @@ from .const import (
     DATA_REMOVE_DISCOVER_COMPONENT,
     DATA_UNSUB,
     PLATFORMS,
+    DOMAIN,
 )
+from .update import get_installed_version, get_latest_version, async_update_firmware_info
+from .update_entity import TasmotaUpdateEntity
+from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
+from datetime import timedelta
 
 _LOGGER = logging.getLogger(__name__)
-
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tasmota from a config entry."""
     hass.data[DOMAIN] = hass.data.get(DOMAIN, {})
-    
-    # MQTT Client
+
     async def _publish(
         topic: str,
         payload: mqtt.PublishPayloadType,
@@ -81,17 +84,15 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Setup the update sensor
     name = entry.data[CONF_NAME]
-    topic = entry.data[CONF_TOPIC]
-    
-    # Fetch the installed version and latest version
-    installed_version = await get_installed_version(tasmota_mqtt, topic)
+
+    installed_version = await get_installed_version(entry)
     latest_version = await get_latest_version()
     
     coordinator = DataUpdateCoordinator(
         hass,
         _LOGGER,
         name=f"Tasmota firmware update {name}",
-        update_method=lambda: async_update_firmware_info(tasmota_mqtt, topic),
+        update_method=lambda: async_update_firmware_info(tasmota_mqtt, entry),
         update_interval=timedelta(hours=1),
     )
     
@@ -104,7 +105,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             installed_version=installed_version,
             latest_version=latest_version,
             tasmota_mqtt=tasmota_mqtt,
-            topic=topic,
+            topic=f"{entry.data[CONF_DISCOVERY_PREFIX]}/cmnd/Upgrade"  # Ensure this is correct
         ),
         "coordinator": coordinator
     }
@@ -137,7 +138,6 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     return True
 
-
 async def _remove_device(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -158,7 +158,6 @@ async def _remove_device(
         device.id, remove_config_entry_id=config_entry.entry_id
     )
 
-
 def _update_device(
     hass: HomeAssistant,
     config_entry: ConfigEntry,
@@ -177,7 +176,6 @@ def _update_device(
         sw_version=config[CONF_SW_VERSION],
     )
 
-
 async def async_setup_device(
     hass: HomeAssistant,
     mac: str,
@@ -191,7 +189,6 @@ async def async_setup_device(
         await _remove_device(hass, config_entry, mac, tasmota_mqtt, device_registry)
     else:
         _update_device(hass, config_entry, config, device_registry)
-
 
 async def async_remove_config_entry_device(
     hass: HomeAssistant, config_entry: ConfigEntry, device_entry: dr.DeviceEntry
