@@ -39,8 +39,9 @@ _LOGGER = logging.getLogger(__name__)
 
 async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Set up Tasmota from a config entry."""
-    hass.data[DATA_UNSUB] = []
-
+    hass.data[DOMAIN] = hass.data.get(DOMAIN, {})
+    
+    # MQTT Client
     async def _publish(
         topic: str,
         payload: mqtt.PublishPayloadType,
@@ -78,8 +79,37 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
         hass, discovery_prefix, entry, tasmota_mqtt, async_discover_device
     )
 
+    # Setup the update sensor
+    name = entry.data[CONF_NAME]
+    topic = entry.data[CONF_TOPIC]
+    
+    # Fetch the installed version and latest version
+    installed_version = await get_installed_version(tasmota_mqtt, topic)
+    latest_version = await get_latest_version()
+    
+    coordinator = DataUpdateCoordinator(
+        hass,
+        _LOGGER,
+        name=f"Tasmota firmware update {name}",
+        update_method=lambda: async_update_firmware_info(tasmota_mqtt, topic),
+        update_interval=timedelta(hours=1),
+    )
+    
+    await coordinator.async_refresh()
+    
+    hass.data[DOMAIN][entry.entry_id] = {
+        "mqtt": tasmota_mqtt,
+        "update": TasmotaUpdateEntity(
+            name=name,
+            installed_version=installed_version,
+            latest_version=latest_version,
+            tasmota_mqtt=tasmota_mqtt,
+            topic=topic,
+        ),
+        "coordinator": coordinator
+    }
+    
     return True
-
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Unload a config entry."""
