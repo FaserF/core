@@ -3,27 +3,29 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import datetime, timedelta
 import logging
 import re
-from datetime import datetime, timedelta
 from typing import Any
 
 import aiohttp
-from packaging.version import Version, InvalidVersion
+from hatasmota import TasmotaUpdate
+from hatasmota.entity import TasmotaEntity as HATasmotaEntity
+from hatasmota.models import DiscoveryHashType
+from packaging.version import InvalidVersion, Version
 
 from homeassistant.components import update
 from homeassistant.components.update import UpdateEntity, UpdateEntityFeature
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.aiohttp_client import async_get_clientsession
-from homeassistant.helpers.dispatcher import async_dispatcher_connect, async_dispatcher_send
+from homeassistant.helpers.dispatcher import (
+    async_dispatcher_connect,
+    async_dispatcher_send,
+)
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 from homeassistant.helpers.event import async_track_time_interval
 from homeassistant.util import dt as dt_util
-
-from hatasmota import TasmotaUpdate
-from hatasmota.entity import TasmotaEntity as HATasmotaEntity
-from hatasmota.models import DiscoveryHashType
 
 from .const import DATA_REMOVE_DISCOVER_COMPONENT, DOMAIN
 from .discovery import TASMOTA_DISCOVERY_ENTITY_NEW
@@ -114,7 +116,7 @@ async def _fetch_latest_release(hass: HomeAssistant) -> dict[str, Any] | None:
         _LOGGER.warning("Timeout fetching latest Tasmota release from GitHub")
     except aiohttp.ClientError as err:
         _LOGGER.warning("Error fetching latest Tasmota release: %s", err)
-    except Exception:  # noqa: BLE001
+    except Exception:
         _LOGGER.exception("Unexpected error fetching Tasmota release")
     return None
 
